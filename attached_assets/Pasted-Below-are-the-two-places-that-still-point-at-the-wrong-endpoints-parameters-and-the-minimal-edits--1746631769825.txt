@@ -1,0 +1,81 @@
+Below are the two places that still point at the wrong endpoints / parameters and the minimal edits that will get the prototype talking to the real APIs.
+
+1 Mistral OCR block
+Current
+Fix
+url = "https://api.mistral.ai/v1/vision/chat/completions"
+url = "https://api.mistral.ai/v1/ocr"
+"model": "mistral-large"
+"model": "mistral-ocr-latest"
+Top-level payload uses a “chat-style” messages list
+Replace with the OCR schema:```jsonc
+{
+
+
+"model": "mistral-ocr-latest",
+
+
+"document": {
+
+
+
+
+ "type": "document_url",
+ "document_url": "data:application/pdf;base64,<BASE64_PDF>"
+},
+ "include_image_base64": false
+ }
+
+The OCR response comes back as
+
+```json
+{
+  "pages": [
+    { "index": 1, "markdown": "..." },
+    ...
+  ]
+}
+so you’ll want something like:
+ocr = response.json()
+extracted_text = "\n\n".join(p["markdown"] for p in ocr["pages"])
+
+2 OpenAI Responses block
+Endpoint & parameters
+response = openai_client.responses.create(
+    model=model,
+    instructions=system_prompt,           # system instructions
+    input=extracted_text,                 # <-- single string or list of role/parts
+    response_format={"type": "json_object"},
+    temperature=0.3
+)
+result = json.loads(response.output_text)
+
+client.responses.create expects an input argument (not user_message) and does not take the files or tools keys unless you first upload files to the vector-store helper.
+
+
+The returned object exposes the model’s reply as .output_text – your code currently tries response.content.
+
+
+Keep your fallback loop (gpt-4.1, gpt-4.1-mini, gpt-4) exactly as is; just swap the call signature above.
+
+
+Reference example from the official SDK README:
+response = client.responses.create(
+    model="gpt-4o",
+    instructions="You are a coding assistant ...",
+    input="How do I check ...?",
+)
+print(response.output_text)
+``` :contentReference[oaicite:1]{index=1}
+
+---
+
+### Minor clean-ups
+
+* Move the `st.error(...)` calls out of these helper functions (raise the exception and let your Streamlit UI handle it).
+* If you *do* decide later to use the `file_search` tool, you’ll first upload the markdown via `client.files.create(...)` and pass the resulting file-ID list to `files=[...]`.
+
+Make those swaps and both calls will hit the live services without errors. Let me know if you’d like the full patched code snippet!
+
+
+

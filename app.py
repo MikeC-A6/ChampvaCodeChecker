@@ -82,28 +82,36 @@ def main():
                         
                         # Extract text with OCR
                         with st.status(f"Processing {file.name}..."):
-                            st.write("Extracting text with OCR...")
-                            extracted_text = process_document_ocr(temp_file_path)
-                            
-                            if not extracted_text:
-                                st.error(f"Failed to extract text from {file.name}")
+                            try:
+                                st.write("Extracting text with OCR...")
+                                extracted_text = process_document_ocr(temp_file_path)
+                                
+                                if not extracted_text:
+                                    st.error(f"Failed to extract text from {file.name}")
+                                    continue
+                                
+                                st.write("Analyzing document content...")
+                                # Analyze the document with OpenAI
+                                analysis_result = analyze_document_content(extracted_text)
+                                
+                                # Determine document type
+                                doc_type = determine_document_type(analysis_result)
+                                
+                                # Add to results with filename
+                                result = {
+                                    "filename": file.name,
+                                    "document_type": doc_type,
+                                    "analysis": analysis_result
+                                }
+                                st.session_state.results.append(result)
+                                st.write(f"Completed processing {file.name}")
+                                
+                            except ValueError as ve:
+                                st.error(f"Error processing {file.name}: {str(ve)}")
                                 continue
-                            
-                            st.write("Analyzing document content...")
-                            # Analyze the document with OpenAI
-                            analysis_result = analyze_document_content(extracted_text)
-                            
-                            # Determine document type
-                            doc_type = determine_document_type(analysis_result)
-                            
-                            # Add to results with filename
-                            result = {
-                                "filename": file.name,
-                                "document_type": doc_type,
-                                "analysis": analysis_result
-                            }
-                            st.session_state.results.append(result)
-                            st.write(f"Completed processing {file.name}")
+                            except Exception as e:
+                                st.error(f"Unexpected error processing {file.name}: {str(e)}")
+                                continue
                         
                         # Clean up temporary file
                         os.unlink(temp_file_path)
