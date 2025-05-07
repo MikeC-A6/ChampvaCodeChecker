@@ -2,7 +2,6 @@ import os
 import requests
 import json
 import base64
-import streamlit as st
 from openai import OpenAI
 
 # API Keys from environment variables
@@ -38,7 +37,17 @@ def process_document_ocr(file_path):
     
     # Get file extension to determine content type
     file_ext = file_path.split('.')[-1].lower()
-    content_type = "application/pdf" if file_ext == "pdf" else f"image/{file_ext}"
+    if file_ext == "pdf":
+        content_type = "application/pdf"
+    elif file_ext in ("jpg", "jpeg"):
+        content_type = "image/jpeg"
+    else:
+        content_type = f"image/{file_ext}"
+        
+    # Check file size
+    file_size_mb = len(file_base64) / 1024 / 1024  # Convert to MB
+    if file_size_mb > 10:
+        raise ValueError(f"File is too large ({file_size_mb:.1f} MB). Please use a smaller file (under 10 MB).")
     
     # Prepare the API request
     url = "https://api.mistral.ai/v1/ocr"
@@ -122,7 +131,7 @@ def analyze_document_content(extracted_text):
                 model=model,
                 instructions=system_prompt,
                 input=extracted_text,
-                response_format={"type": "json_object"},
+                format="json_object",
                 temperature=0.3
             )
             
