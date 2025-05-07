@@ -81,7 +81,7 @@ def main():
                             temp_file_path = temp_file.name
                         
                         # Extract text with OCR
-                        with st.status(f"Processing {file.name}..."):
+                        with st.spinner(f"Processing {file.name}..."):
                             try:
                                 st.write("Extracting text with OCR...")
                                 extracted_text = process_document_ocr(temp_file_path)
@@ -121,7 +121,6 @@ def main():
             
             st.session_state.processing = False
             st.success("Document processing complete!")
-            st.rerun()
     
     # Display results if available
     if st.session_state.results:

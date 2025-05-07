@@ -131,7 +131,6 @@ def analyze_document_content(extracted_text):
                 model=model,
                 instructions=system_prompt,
                 input=extracted_text,
-                format="json_object",
                 temperature=0.3
             )
             
