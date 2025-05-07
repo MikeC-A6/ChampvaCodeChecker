@@ -3,10 +3,14 @@ import requests
 import json
 import base64
 import streamlit as st
+from openai import OpenAI
 
 # API Keys from environment variables
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Initialize OpenAI client
+openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 def process_document_ocr(file_path):
     """
@@ -75,7 +79,7 @@ def process_document_ocr(file_path):
 
 def analyze_document_content(extracted_text):
     """
-    Analyze the document content using OpenAI's API to check for missing or invalid medical codes.
+    Analyze the document content using OpenAI's Responses API to check for missing or invalid medical codes.
     
     Args:
         extracted_text: The extracted text from the document
@@ -87,13 +91,6 @@ def analyze_document_content(extracted_text):
         raise ValueError("OpenAI API key not found in environment variables")
     
     try:
-        # Prepare the API request
-        url = "https://api.openai.com/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {OPENAI_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        
         system_prompt = """
         You are an expert medical coder helping to validate CHAMPVA claim support documents.
         
@@ -125,37 +122,36 @@ def analyze_document_content(extracted_text):
         models_to_try = ["gpt-4.1", "gpt-4.1-mini", "gpt-4"]
         
         for model in models_to_try:
-            payload = {
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": extracted_text}
-                ],
-                "temperature": 0.3,
-                "response_format": {"type": "json_object"}
-            }
-            
-            # Make the API request
-            response = requests.post(url, headers=headers, json=payload)
-            
-            # Check if the request was successful
-            if response.status_code == 200:
-                response_data = response.json()
-                result_json = response_data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
+            try:
+                # Use the new Responses API with file_search tool
+                response = openai_client.responses.create(
+                    model=model,
+                    instructions=system_prompt,
+                    tools=[{"type": "file_search"}],
+                    files=[{"name": "document.md", "content": extracted_text}],
+                    format="json_object",
+                    user_message="Please audit the attached CHAMPVA document.",
+                    temperature=0.3
+                )
                 
+                # Get the response content and parse as JSON
                 try:
-                    # Parse the JSON response
-                    result = json.loads(result_json)
+                    # The response is already in JSON format
+                    result = json.loads(response.content)
                     return result
                 except json.JSONDecodeError:
-                    continue  # Try next model if JSON parsing fails
-            
-            # If we get a model-related error, try the next model
-            if response.status_code == 404 or "model" in response.text.lower():
-                continue
-            
-            # For other errors, raise an exception
-            response.raise_for_status()
+                    # If JSON parsing fails, try the next model
+                    continue
+                    
+            except Exception as model_error:
+                # Check if it's a model-related error
+                error_str = str(model_error).lower()
+                if "model" in error_str or "not found" in error_str:
+                    # Try the next model
+                    continue
+                else:
+                    # For other errors, raise the exception
+                    raise model_error
         
         # If all models fail, return an error result
         return {

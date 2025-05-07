@@ -745,7 +745,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "openai", specifier = ">=1.77.0" },
+    { name = "openai", specifier = ">=1.30" },
     { name = "requests", specifier = ">=2.32.3" },
     { name = "streamlit", specifier = ">=1.45.0" },
 ]
